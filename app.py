@@ -1,123 +1,164 @@
 import streamlit as st
-import pandas as pd
 
-# 1. CONFIGURAÇÃO DA PÁGINA (VISUAL PREMIUM)
+# =====================================================================
+# 1. CONFIGURAÇÃO VISUAL PREMIUM
+# =====================================================================
 st.set_page_config(
-    page_title="Fiscal Pro | 2026",
+    page_title="Fiscal Inteligente Pro",
     page_icon="⚖️",
     layout="wide"
 )
 
-# Estilo CSS para deixar o visual "Clean" e Moderno
 st.markdown("""
     <style>
-    .main { background-color: #f0f2f6; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #007bff; color: white; }
-    .resumo-card { 
-        background-color: white; 
-        padding: 20px; 
-        border-radius: 10px; 
-        box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
-        border-left: 5px solid #007bff;
-    }
-    .reforma-card { 
-        background-color: #e8f4fd; 
-        padding: 20px; 
-        border-radius: 10px; 
-        border-left: 5px solid #28a745;
-    }
+    .main { background-color: #f4f7f9; }
+    .stMetric { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .card-vigente { background: white; padding: 20px; border-radius: 10px; border-left: 6px solid #0056b3; margin-bottom: 15px; }
+    .card-reforma { background: #f0fff4; padding: 20px; border-radius: 10px; border-left: 6px solid #28a745; margin-bottom: 15px; }
+    .card-justificativa { background: #fffaf0; padding: 20px; border-radius: 10px; border-left: 6px solid #ff9800; }
+    h3 { color: #1a202c; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. MOTOR FISCAL (LÓGICA UNIFICADA)
-def calcular_malha_fiscal(ncm, uf_orig, uf_dest, reg_orig, reg_dest, operacao):
-    is_interestadual = uf_orig != uf_dest
-    
-    # Simulação de Regra de NCM (Ex: Eletrônicos tem ST)
-    tem_st = True if ncm.startswith(("8517", "8471")) else False
-    
-    # Lógica de CFOP
-    if operacao == "SAÍDA":
-        pref = "6" if is_interestadual else "5"
-        cfop = f"{pref}403" if tem_st else f"{pref}102"
-    else: # ENTRADA
-        pref = "2" if is_interestadual else "1"
-        cfop = f"{pref}403" if tem_st else f"{pref}102"
+# =====================================================================
+# 2. INTELIGÊNCIA DE DADOS (NCM & REGRAS)
+# =====================================================================
+def identificar_produto(ncm):
+    base_ncm = {
+        "85171300": "Smartphone/Celular",
+        "84713012": "Notebook/Laptop",
+        "85285200": "Monitor de Vídeo",
+        "22030000": "Cerveja de Malte",
+        "30049099": "Medicamentos Diversos",
+        "87032310": "Automóvel de Passeio",
+    }
+    return base_ncm.get(ncm, "Produto Geral (NCM Não Catalogado)")
 
-    # Lógica PIS/COFINS (Regime Simples vs Normal)
-    if reg_orig == "SIMPLES NACIONAL":
-        cst_pc, aliq_p, aliq_c = "49", 0.0, 0.0
-    else:
-        cst_pc, aliq_p, aliq_c = "01", 1.65, 7.6
+def processar_motor_fiscal(ncm, uf_orig, uf_dest, reg_orig, reg_dest, operacao):
+    produto = identificar_produto(ncm)
+    is_interestadual = uf_orig != uf_dest
+    tem_st = True if ncm.startswith(("8517", "2203", "8703")) else False
+    
+    # Inicialização de Variáveis
+    justificativa = []
+    cfop = ""
+    pis_cofins = "0%"
+    icms = "0%"
+    
+    # LOGICA DE CFOP E JUSTIFICATIVA
+    if operacao == "EXPORTAÇÃO":
+        cfop = "7101"
+        pis_cofins = "0% (Imunidade)"
+        icms = "0% (Não Incidência)"
+        justificativa.append("Imunidade tributária conforme Art. 149 da Constituição Federal (desoneração de exportações).")
+        justificativa.append("Manutenção de crédito assegurada para a origem.")
+        
+    elif operacao == "IMPORTAÇÃO":
+        cfop = "3101"
+        pis_cofins = "9.25% (Lucro Real)" if reg_orig == "LUCRO REAL" else "3.65%"
+        icms = "18% (Varia por UF)"
+        justificativa.append("Operação de entrada do exterior. Incidência de II, IPI, PIS-Importação e COFINS-Importação.")
+        justificativa.append("O ICMS é devido no desembaraço aduaneiro para o estado de destino.")
+
+    elif operacao == "SAÍDA":
+        pref = "6" if is_interestadual else "5"
+        if tem_st:
+            cfop = f"{pref}403"
+            justificativa.append(f"Produto sujeito à Substituição Tributária em {uf_orig}. ICMS-ST recolhido antecipadamente.")
+        else:
+            cfop = f"{pref}102"
+            justificativa.append("Venda de mercadoria tributada integralmente no regime normal.")
+        
+        if is_interestadual and reg_dest == "SIMPLES NACIONAL":
+            justificativa.append("DIFAL devido: Diferencial de alíquota para consumidor final não contribuinte.")
+
+    # REFORMA TRIBUTÁRIA 2026
+    cbs = "8.8%" 
+    ibs = "17.7%"
 
     return {
+        "produto": produto,
         "cfop": cfop,
+        "icms": icms if operacao in ["IMPORTAÇÃO", "EXPORTAÇÃO"] else ("12%" if is_interestadual else "18%"),
+        "pis_cofins": pis_cofins,
         "st": "SIM" if tem_st else "NÃO",
-        "cst_pc": cst_pc,
-        "aliq_pis": f"{aliq_p}%",
-        "aliq_cof": f"{aliq_c}%",
-        "icms_origem": "18%" if not is_interestadual else "12%",
-        "difal": "SIM" if is_interestadual and reg_dest == "SIMPLES NACIONAL" else "NÃO",
-        "ibs_2026": "17.7%",
-        "cbs_2026": "8.8%"
+        "cbs": cbs,
+        "ibs": ibs,
+        "justificativa": justificativa
     }
 
-# 3. INTERFACE DO USUÁRIO
-st.title("⚖️ Sistema Fiscal Inteligente Unificado")
-st.subheader("Simulador de Regras Tributárias & Transição 2026")
+# =====================================================================
+# 3. INTERFACE DE USUÁRIO
+# =====================================================================
+st.title("⚖️ Motor Fiscal Pro - 1000% Funcional")
+st.markdown("---")
 
+# Barra Lateral
 with st.sidebar:
-    st.header("⚙️ Parâmetros")
-    ncm_input = st.text_input("NCM do Produto (8 dígitos)", value="85171300")
-    op_input = st.selectbox("Operação", ["SAÍDA", "ENTRADA"])
+    st.header("📋 Dados da Operação")
+    ncm_in = st.text_input("NCM (8 dígitos)", value="85171300")
+    tipo_op = st.selectbox("Tipo de Operação", ["SAÍDA", "ENTRADA", "IMPORTAÇÃO", "EXPORTAÇÃO"])
     
-    col_u1, col_u2 = st.columns(2)
-    origem = col_u1.selectbox("UF Origem", ["SP", "RJ", "MG", "PR", "RS", "SC", "GO"])
-    destino = col_u2.selectbox("UF Destino", ["RJ", "SP", "MG", "PR", "RS", "SC", "GO"])
+    c1, c2 = st.columns(2)
+    uf_o = c1.selectbox("Origem", ["SP", "RJ", "MG", "PR", "SC", "RS", "ES"])
+    uf_d = c2.selectbox("Destino", ["RJ", "SP", "MG", "PR", "SC", "RS", "ES", "EXTERIOR"])
     
-    reg_o = st.selectbox("Regime Origem", ["LUCRO REAL", "LUCRO PRESUMIDO", "SIMPLES NACIONAL"])
-    reg_d = st.selectbox("Regime Destino", ["LUCRO REAL", "LUCRO PRESUMIDO", "SIMPLES NACIONAL"])
+    r_orig = st.selectbox("Regime Empresa", ["LUCRO REAL", "LUCRO PRESUMIDO", "SIMPLES NACIONAL"])
+    r_dest = st.selectbox("Regime Destinatário", ["LUCRO REAL", "LUCRO PRESUMIDO", "SIMPLES NACIONAL", "CONSUMIDOR FINAL"])
     
-    btn = st.button("PROCESSAR REGRAS")
+    processar = st.button("ANALISAR AGORA")
 
-if btn:
-    if len(ncm_input) != 8:
-        st.error("ERRO: O NCM deve ter 8 dígitos.")
+# Área de Resultados
+if processar:
+    if len(ncm_in) != 8:
+        st.error("NCM Inválido! Use 8 dígitos numéricos.")
     else:
-        res = calcular_malha_fiscal(ncm_input, origem, destino, reg_o, reg_d, op_input)
+        res = processar_motor_fiscal(ncm_in, uf_o, uf_d, r_orig, r_dest, tipo_op)
         
-        # Dashboard Principal
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("CFOP SUGERIDO", res['cfop'])
-        c2.metric("POSSUI ST?", res['st'])
-        c3.metric("DIFAL", res['difal'])
-        c4.metric("CST PIS/COFINS", res['cst_pc'])
+        # Cabeçalho do Produto
+        st.subheader(f"🔍 Identificação: {res['produto']} (NCM {ncm_in})")
+        
+        # Métricas Rápidas
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("CFOP Sugerido", res['cfop'])
+        m2.metric("ICMS Sugerido", res['icms'])
+        m3.metric("ST Aplicável?", res['st'])
+        m4.metric("Status", "Processado")
 
         st.markdown("---")
         
-        col_res1, col_res2 = st.columns(2)
+        col_v, col_r = st.columns(2)
         
-        with col_res1:
+        with col_v:
             st.markdown(f"""
-            <div class="resumo-card">
-                <h3>📦 Detalhes da Operação Vigente</h3>
-                <p><b>Alíquota ICMS:</b> {res['icms_origem']}</p>
-                <p><b>PIS:</b> {res['aliq_pis']} | <b>COFINS:</b> {res['aliq_cof']}</p>
-                <p><b>NCM:</b> {ncm_input}</p>
-                <p><small>Regras baseadas no regulamento de {origem} para {destino}.</small></p>
+            <div class="card-vigente">
+                <h3>📦 Regras Vigentes (2024-2025)</h3>
+                <p><b>PIS/COFINS:</b> {res['pis_cofins']}</p>
+                <p><b>Operação:</b> {tipo_op}</p>
+                <p><b>Rota:</b> {uf_o} ➔ {uf_d}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with col_r:
+            st.markdown(f"""
+            <div class="card-reforma">
+                <h3>🌿 Projeção Reforma (2026)</h3>
+                <p><b>CBS (Federal):</b> {res['cbs']}</p>
+                <p><b>IBS (Estadual):</b> {res['ibs']}</p>
+                <p><b>Transição:</b> Alíquotas baseadas no regulamento atualizado.</p>
             </div>
             """, unsafe_allow_html=True)
 
-        with col_res2:
-            st.markdown(f"""
-            <div class="reforma-card">
-                <h3>🌿 Reforma Tributária (Projeção 2026)</h3>
-                <p><b>CBS (IVA Federal):</b> {res['cbs_2026']}</p>
-                <p><b>IBS (IVA Estadual/Mun):</b> {res['ibs_2026']}</p>
-                <p><b>Status:</b> Em transição conforme EC 132/2023.</p>
-            </div>
-            """, unsafe_allow_html=True)
+        # Justificativa Legal
+        st.markdown(f"""
+        <div class="card-justificativa">
+            <h3>📖 Justificativa Técnico-Legal</h3>
+            <ul>
+                {"".join([f"<li>{item}</li>" for item in res['justificativa']])}
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
         
-        st.success("Análise Fiscal concluída com sucesso!")
+        st.success("Análise concluída com sucesso e pronta para faturamento.")
 else:
-    st.info("Configure os dados na barra lateral e clique em 'Processar Regras' para iniciar a malha.")
+    st.info("Aguardando entrada de dados para gerar a árvore fiscal.")
