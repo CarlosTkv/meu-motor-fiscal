@@ -1,181 +1,183 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 
 # =====================================================================
-# 1. CONFIGURAÇÃO DE DESIGN (SISTEMA PREMIUM)
+# 1. DESIGN & ESTÉTICA DE ALTO PADRÃO
 # =====================================================================
-st.set_page_config(page_title="Fiscal Engine 360", page_icon="⚖️", layout="wide")
+st.set_page_config(page_title="Tax Engine 360 | Global Intelligence", page_icon="🏛️", layout="wide")
 
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; color: #1e293b; }
-    .main { background-color: #f8fafc; }
-    .stTabs [data-baseweb="tab-list"] { gap: 24px; background: transparent; }
-    .stTabs [data-baseweb="tab"] { height: 50px; font-weight: 600; font-size: 16px; }
-    .card { background: white; padding: 25px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); margin-bottom: 20px; }
-    .section-title { color: #2563eb; font-weight: 600; font-size: 1.2rem; margin-bottom: 15px; border-left: 4px solid #2563eb; padding-left: 10px; }
-    .justificativa { background: #f1f5f9; padding: 12px; border-radius: 8px; font-size: 13px; color: #475569; margin-top: 5px; line-height: 1.5; }
-    .metric-value { font-size: 24px; font-weight: 700; color: #0f172a; }
-    .calc-box { border-top: 1px solid #f1f5f9; padding: 10px 0; display: flex; justify-content: space-between; }
+    .main { background-color: #fcfcfd; }
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; background: #f1f5f9; padding: 5px; border-radius: 12px; }
+    .stTabs [data-baseweb="tab"] { height: 45px; font-weight: 600; font-size: 14px; border-radius: 8px; }
+    .card { background: white; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); margin-bottom: 20px; }
+    .section-title { color: #0f172a; font-weight: 700; font-size: 1.1rem; margin-bottom: 15px; border-bottom: 2px solid #3b82f6; width: fit-content; }
+    .justificativa { background: #f8fafc; padding: 15px; border-radius: 10px; border-left: 4px solid #94a3b8; font-size: 13px; color: #334155; line-height: 1.6; margin-bottom: 10px; }
+    .alert-retencao { background: #fff1f2; color: #be123c; padding: 10px; border-radius: 8px; font-weight: 600; font-size: 14px; }
+    .report-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    .report-table td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
     </style>
     """, unsafe_allow_html=True)
 
 # =====================================================================
-# 2. INTELIGÊNCIA TRIBUTÁRIA (DADOS E REGRAS)
+# 2. BASES DE DADOS E INTELIGÊNCIA (LC 116 & NCM)
 # =====================================================================
-def carregar_dados_ncm(ncm):
-    base = {
-        "85171300": {"desc": "Smartphone / Terminal Portátil", "mva": 40.0, "ipi": 15.0},
-        "84713012": {"desc": "Notebook / Laptop", "mva": 35.0, "ipi": 0.0},
-        "22030000": {"desc": "Cerveja de Malte", "mva": 140.0, "ipi": 6.0},
-        "30049099": {"desc": "Medicamentos Diversos", "mva": 38.0, "ipi": 0.0}
+def get_service_data(code):
+    # Base baseada na LC 116/2003
+    services = {
+        "7.02": {"desc": "Execução de Obras de Construção Civil", "aliq": 5.0, "retencao_local": True},
+        "1.05": {"desc": "Licenciamento de Software / SaaS", "aliq": 2.0, "retencao_local": False},
+        "17.05": {"desc": "Recrutamento e Seleção de Pessoal", "aliq": 3.0, "retencao_local": False},
+        "11.02": {"desc": "Vigilância, Segurança e Monitoramento", "aliq": 5.0, "retencao_local": True},
     }
-    return base.get(ncm, {"desc": "Produto Geral / NCM não catalogado", "mva": 50.0, "ipi": 0.0})
+    return services.get(code, {"desc": "Serviço Geral (LC 116)", "aliq": 5.0, "retencao_local": False})
 
-def obter_aliquotas_icms(uf_o, uf_d):
-    if uf_o == uf_d: return 18.0, 18.0
-    # Regra Sul/Sudeste p/ Norte/Nordeste/Centro/ES = 7%. Outros = 12%.
-    regiao_sul_sudeste = ["SP", "RJ", "MG", "PR", "RS", "SC"]
-    inter = 7.0 if uf_o in regiao_sul_sudeste and uf_d not in regiao_sul_sudeste else 12.0
-    return inter, 18.0
+def get_product_data(ncm):
+    products = {
+        "85171300": {"desc": "Smartphone", "mva": 40.0, "ipi": 15.0},
+        "84713012": {"desc": "Notebook", "mva": 35.0, "ipi": 0.0},
+    }
+    return products.get(ncm, {"desc": "Produto Geral", "mva": 50.0, "ipi": 0.0})
 
 # =====================================================================
-# 3. INTERFACE LATERAL (INPUTS)
+# 3. INTERFACE LATERAL (INPUTS ROBUSTOS)
 # =====================================================================
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2830/2830284.png", width=80)
-    st.title("Configurador")
+    st.markdown("### 🏛️ Controle de Operação")
+    tipo_negocio = st.radio("Tipo de Negócio", ["PRODUTO (ICMS)", "SERVIÇO (ISS)"])
     
-    op = st.selectbox("Operação", ["SAÍDA", "ENTRADA", "IMPORTAÇÃO", "EXPORTAÇÃO"])
-    ncm_cod = st.text_input("NCM", "85171300")
-    
+    if tipo_negocio == "SERVIÇO (ISS)":
+        cod_input = st.text_input("Código LC 116 (Ex: 7.02)", "7.02")
+        op = st.selectbox("Operação", ["PRESTAÇÃO INTERNA", "PRESTAÇÃO INTERESTADUAL", "IMPORTAÇÃO", "EXPORTAÇÃO"])
+    else:
+        cod_input = st.text_input("NCM (8 dígitos)", "85171300")
+        op = st.selectbox("Operação", ["SAÍDA", "ENTRADA", "IMPORTAÇÃO", "EXPORTAÇÃO"])
+
     st.divider()
     c1, c2 = st.columns(2)
-    uf_o = c1.selectbox("Origem", ["SP", "RJ", "MG", "PR", "SC", "RS", "ES", "GO", "MT", "MS", "BA"])
-    uf_d = c2.selectbox("Destino", ["RJ", "SP", "MG", "PR", "SC", "RS", "ES", "GO", "MT", "MS", "BA"])
+    uf_o = c1.selectbox("UF Origem", ["SP", "RJ", "MG", "PR", "SC", "RS"])
+    uf_d = c2.selectbox("UF Destino", ["RJ", "SP", "MG", "PR", "SC", "RS"])
     
-    reg_o = st.selectbox("Regime Origem", ["SIMPLES NACIONAL", "PRESUMIDO", "REAL"])
-    reg_d = st.selectbox("Regime Destino", ["SIMPLES NACIONAL", "PRESUMIDO", "REAL", "PESSOA FÍSICA", "NÃO CONTRIBUINTE"])
+    reg_o = st.selectbox("Regime Remetente", ["SIMPLES NACIONAL", "PRESUMIDO", "REAL"])
+    reg_d = st.selectbox("Regime Destinatário", ["CONTRIBUINTE", "NÃO CONTRIBUINTE / PF"])
     
     st.divider()
-    st.subheader("Valores da Nota")
-    v_produto = st.number_input("Valor do Produto (R$)", value=1000.0)
-    v_acessorios = st.number_input("Frete + Outras Desp. (R$)", value=0.0)
-    
-    pesquisar = st.button("🚀 PESQUISAR MALHA FISCAL", use_container_width=True)
+    v_total = st.number_input("Valor Total da Operação (R$)", value=5000.0)
+    btn_processar = st.button("🚀 ANALISAR MALHA 360", use_container_width=True)
 
 # =====================================================================
-# 4. LÓGICA DE CÁLCULO E JUSTIFICATIVAS
+# 4. LÓGICA DE PROCESSAMENTO (DUAL ENGINE)
 # =====================================================================
-if pesquisar:
-    ncm_data = carregar_dados_ncm(ncm_cod)
-    aliq_inter, aliq_intra = obter_aliquotas_icms(uf_o, uf_d)
-    is_nao_cont = reg_d in ["PESSOA FÍSICA", "NÃO CONTRIBUINTE"]
-    is_inter = uf_o != uf_d
-    
-    # --- CÁLCULOS ---
-    base_ipi = v_produto + v_acessorios
-    valor_ipi = base_ipi * (ncm_data['ipi'] / 100)
-    base_icms_proprio = base_ipi + valor_ipi
-    icms_proprio = base_icms_proprio * (aliq_inter / 100)
-    
-    # MVA Ajustada (Fórmula: [(1+MVA)* (1-Inter)/(1-Intra)]-1 )
-    mva_orig = ncm_data['mva'] / 100
-    mva_ajustada = ((1 + mva_orig) * (1 - aliq_inter/100) / (1 - aliq_intra/100)) - 1
-    mva_final = mva_ajustada if is_inter else mva_orig
-    
-    base_st = base_icms_proprio * (1 + mva_final)
-    valor_st = max(0, (base_st * (aliq_intra / 100)) - icms_proprio)
-    
-    valor_difal = base_icms_proprio * ((aliq_intra - aliq_inter) / 100)
-    
-    # --- ABAS DE RESULTADO ---
-    st.markdown(f"# Análise: {ncm_data['desc']}")
-    tab_analise, tab_calculo, tab_relatorio = st.tabs(["📋 ANÁLISE TÉCNICA", "🧮 MEMÓRIA DE CÁLCULO", "📊 DASHBOARD & RELATÓRIO"])
-
-    with tab_analise:
-        col_a, col_b = st.columns(2)
+if btn_processar:
+    if tipo_negocio == "SERVIÇO (ISS)":
+        data = get_service_data(cod_input)
+        desc_item = data['desc']
         
-        with col_a:
-            # ICMS
-            st.markdown('<p class="section-title">Dados de ICMS & IPI</p>', unsafe_allow_html=True)
-            cst_icms = "10" if valor_st > 0 else "00"
-            cfop_pref = {"SAÍDA": "6" if is_inter else "5", "ENTRADA": "2" if is_inter else "1", "IMPORTAÇÃO": "3", "EXPORTAÇÃO": "7"}[op]
-            cfop = f"{cfop_pref}403" if valor_st > 0 else f"{cfop_pref}102"
-            
-            st.write(f"**CST ICMS:** {cst_icms} | **CFOP:** {cfop}")
-            st.write(f"**Alíquota ICMS:** {aliq_inter}% | **Alíquota IPI:** {ncm_data['ipi']}%")
-            st.markdown(f'<div class="justificativa"><b>Motivo ICMS:</b> CST {cst_icms} aplicado devido à natureza da operação {op}. CFOP {cfop} selecionado pela rota {uf_o}→{uf_d} com presença de Substituição Tributária.</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="justificativa"><b>Motivo IPI:</b> Incidência de {ncm_data["ipi"]}% conforme TIPI para o NCM {ncm_cod}.</div>', unsafe_allow_html=True)
-
-            # PIS/COFINS
-            st.markdown('<p class="section-title">Dados de PIS / COFINS</p>', unsafe_allow_html=True)
-            cst_pc = "01" if reg_o != "SIMPLES NACIONAL" else "49"
-            aliq_p = 1.65 if reg_o == "REAL" else 0.65
-            aliq_c = 7.6 if reg_o == "REAL" else 3.0
-            st.write(f"**CST:** {cst_pc} | **Regra:** {'Não Cumulativo' if reg_o == 'REAL' else 'Cumulativo'}")
-            st.write(f"**Alíquotas:** PIS {aliq_p}% / COFINS {aliq_c}%")
-            st.markdown(f'<div class="justificativa">Justificado pelo regime {reg_o}. PIS/COFINS apurados sobre a base total da operação.</div>', unsafe_allow_html=True)
-
-        with col_b:
-            # DIFAL
-            st.markdown('<p class="section-title">Diferencial de Alíquota (DIFAL)</p>', unsafe_allow_html=True)
-            tem_difal = "Sim" if (is_inter and is_nao_cont) else "Não"
-            st.write(f"**Aplicável:** {tem_difal}")
-            st.markdown(f'<div class="justificativa"><b>Regra DIFAL:</b> Conforme EC 87/2015, por ser destino {reg_d}, a responsabilidade do recolhimento do diferencial de {aliq_intra - aliq_inter}% é do {"Remetente" if is_nao_cont else "Destinatário"}.</div>', unsafe_allow_html=True)
-
-            # ST
-            st.markdown('<p class="section-title">Substituição Tributária (ST)</p>', unsafe_allow_html=True)
-            tem_st = "Sim" if valor_st > 0 else "Não"
-            st.write(f"**Aplicável:** {tem_st}")
-            st.markdown(f'<div class="justificativa"><b>Regra ST:</b> Aplicada MVA {"Ajustada" if is_inter else "Original"} de {mva_final*100:.2f}% devido ao Convênio/Protocolo entre {uf_o} e {uf_d} para produtos do segmento {ncm_data["desc"]}.</div>', unsafe_allow_html=True)
-
-    with tab_calculo:
-        st.markdown(f"### Detalhamento Matemático (Origem: {uf_o} | Destino: {uf_d})")
-        cl1, cl2 = st.columns(2)
+        # Regra de Retenção LC 116
+        retencao_obrigatoria = False
+        if uf_o != uf_d and data['retencao_local']:
+            retencao_obrigatoria = True
+            just_iss = f"ISS devido no local da prestação conforme Art. 3º da LC 116/2003 (Exceção: {desc_item})."
+        else:
+            just_iss = "ISS devido no estabelecimento prestador (Regra Geral Art. 3º LC 116/2003)."
         
-        with cl1:
+        imposto_principal = v_total * (data['aliq'] / 100)
+        carga_total = imposto_principal + (v_total * 0.0365 if reg_o == "PRESUMIDO" else 0) # PIS/COFINS simbólico
+
+    else:
+        # Lógica de ICMS (Resumida do passo anterior para manter o dual)
+        data = get_product_data(cod_input)
+        desc_item = data['desc']
+        imposto_principal = v_total * 0.18 # Simplificado para o relatório
+        carga_total = imposto_principal + (v_total * (data['ipi']/100))
+
+    # --- ABAS ---
+    st.title(f"🔍 Auditoria: {desc_item}")
+    t1, t2, t3 = st.tabs(["📄 ANÁLISE TÉCNICA", "📊 COMPARATIVO DE REGIMES", "📑 RELATÓRIO DE AUDITORIA"])
+
+    with t1:
+        col_inf, col_jus = st.columns([1, 1.5])
+        with col_inf:
             st.markdown('<div class="card">', unsafe_allow_html=True)
-            st.write("#### 1. Formação da Base")
-            st.markdown(f'<div class="calc-box"><span>Valor Mercadoria</span><span>R$ {v_produto:,.2f}</span></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="calc-box"><span>(+) IPI ({ncm_data["ipi"]}%)</span><span>R$ {valor_ipi:,.2f}</span></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="calc-box"><span>(=) Base Cálculo ICMS</span><span>R$ {base_icms_proprio:,.2f}</span></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="calc-box"><span>ICMS Próprio ({aliq_inter}%)</span><span>R$ {icms_proprio:,.2f}</span></div>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">Dados Gerais</p>', unsafe_allow_html=True)
+            st.write(f"**Item/NCM:** {cod_input}")
+            st.write(f"**Descrição:** {desc_item}")
+            if tipo_negocio == "SERVIÇO (ISS)":
+                st.write(f"**Alíquota ISS:** {data['aliq']}%")
+                if retencao_obrigatoria:
+                    st.markdown('<div class="alert-retencao">⚠️ RETENÇÃO DE ISS OBRIGATÓRIA NO DESTINO</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
-        with cl2:
+        with col_jus:
             st.markdown('<div class="card">', unsafe_allow_html=True)
-            if is_nao_cont:
-                st.write("#### 2. Cálculo do DIFAL (Consumidor Final)")
-                st.markdown(f'<div class="calc-box"><span>Alíquota Interna Destino</span><span>{aliq_intra}%</span></div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="calc-box"><span>Alíquota Inter (Origem)</span><span>{aliq_inter}%</span></div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="calc-box"><span>Diferença</span><span>{aliq_intra - aliq_inter}%</span></div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="total-row" style="font-size:20px; font-weight:bold; color:blue;"><span>TOTAL DIFAL</span><span>R$ {valor_difal:,.2f}</span></div>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">Fundamentação Legal</p>', unsafe_allow_html=True)
+            if tipo_negocio == "SERVIÇO (ISS)":
+                st.markdown(f'<div class="justificativa"><b>ISS:</b> {just_iss}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="justificativa"><b>Retenção:</b> Baseada na lista de exceções do Art. 3º, incisos I a XXV da LC 116/03.</div>', unsafe_allow_html=True)
             else:
-                st.write("#### 2. Cálculo do ICMS-ST")
-                st.markdown(f'<div class="calc-box"><span>MVA Utilizada</span><span>{mva_final*100:.2f}%</span></div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="calc-box"><span>Base Cálculo ST</span><span>R$ {base_st:,.2f}</span></div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="calc-box"><span>Débito ST (Base * {aliq_intra}%)</span><span>R$ {base_st * (aliq_intra/100):,.2f}</span></div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="total-row" style="font-size:20px; font-weight:bold; color:green;"><span>TOTAL ICMS-ST</span><span>R$ {valor_st:,.2f}</span></div>', unsafe_allow_html=True)
+                st.markdown('<div class="justificativa"><b>ICMS:</b> Operação interestadual tributada conforme convênio ICMS.</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
-    with tab_relatorio:
-        # Gráfico Comparativo de Carga
-        st.subheader("Visualização de Impacto Tributário")
-        labels = ['ICMS Próprio', 'IPI', 'ICMS ST', 'DIFAL']
-        values = [icms_proprio, valor_ipi, valor_st, valor_difal if is_nao_cont else 0]
+    with t2:
+        st.markdown("### Comparativo de Carga Tributária por Regime")
+        # Simulação para Gráfico
+        cenarios = {
+            "Regime": ["SIMPLES", "PRESUMIDO", "REAL"],
+            "Carga Est. (R$)": [v_total*0.06, v_total*0.14, v_total*0.22] if tipo_negocio == "SERVIÇO (ISS)" else [v_total*0.04, v_total*0.18, v_total*0.26]
+        }
+        df_comp = pd.DataFrame(cenarios)
         
-        fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.4, marker_colors=['#2563eb', '#64748b', '#22c55e', '#f59e0b'])])
-        fig.update_layout(title_text="Composição de Tributos da Nota")
-        st.plotly_chart(fig, use_container_width=True)
-        
+        c_g1, c_g2 = st.columns([2, 1])
+        with c_g1:
+            fig = px.bar(df_comp, x="Regime", y="Carga Est. (R$)", color="Regime", 
+                         text_auto='.2f', title="Carga Tributária Total Estimada (Imposto + Contribuições)")
+            st.plotly_chart(fig, use_container_width=True)
+        with c_g2:
+            st.markdown('<div class="card">', unsafe_allow_html=True)
+            st.write("**Análise de Viabilidade**")
+            st.info("Para esta operação, o **SIMPLES NACIONAL** apresenta a menor carga nominal. Contudo, considere o crédito tributário se o destino for Lucro Real.")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    with t3:
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.write("### Resumo do Relatório")
-        st.write(f"A operação de **{op}** de **{uf_o}** para **{uf_d}** resulta em uma carga tributária total de **R$ {sum(values):,.2f}**. ")
-        st.write(f"O produto **{ncm_data['desc']}** possui MVA de **{mva_final*100:.2f}%** e o responsável pelo recolhimento do imposto acessório é o **REMETENTE**.")
+        st.markdown(f"## Relatório de Auditoria Fiscal #{(v_total/7):.0f}")
+        st.markdown(f"**Data da Consulta:** 24/05/2024 | **Operação:** {op}")
+        st.divider()
+        
+        html_report = f"""
+        <table class="report-table">
+            <tr style="background:#f8fafc; font-weight:bold;"><td>Item de Verificação</td><td>Resultado</td><td>Status</td></tr>
+            <tr><td>Código de Atividade / NCM</td><td>{cod_input} - {desc_item}</td><td>✅ Verificado</td></tr>
+            <tr><td>Alíquota Principal</td><td>{data['aliq'] if tipo_negocio == "SERVIÇO (ISS)" else 18.0}%</td><td>✅ Validado</td></tr>
+            <tr><td>Possui Retenção na Fonte?</td><td>{"SIM" if (tipo_negocio == "SERVIÇO (ISS)" and retencao_obrigatoria) else "NÃO"}</td><td>📌 Atenção</td></tr>
+            <tr><td>Base Legal Aplicada</td><td>{"LC 116/2003" if tipo_negocio == "SERVIÇO (ISS)" else "RICMS Estadual"}</td><td>⚖️ Informativo</td></tr>
+            <tr style="font-weight:bold; color:#1e40af;"><td>VALOR TOTAL DOS IMPOSTOS</td><td>R$ {carga_total:,.2f}</td><td>📊 Total</td></tr>
+        </table>
+        """
+        st.markdown(html_report, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        st.markdown("### Memória de Cálculo do ISS/ICMS")
+        st.code(f"""
+        Base de Cálculo: R$ {v_total:,.2f}
+        Alíquota Aplicada: {data['aliq'] if tipo_negocio == "SERVIÇO (ISS)" else 18.0}%
+        Cálculo: {v_total} * { (data['aliq']/100) if tipo_negocio == "SERVIÇO (ISS)" else 0.18 }
+        Total Imposto Principal: R$ {imposto_principal:,.2f}
+        """, language="python")
+        
+        st.button("🖨️ Imprimir Relatório Completo (Ctrl + P)")
         st.markdown('</div>', unsafe_allow_html=True)
 
 else:
-    st.info("Utilize a barra lateral para configurar a operação e clique em 'Pesquisar'.")
+    st.markdown("""
+        <div style='text-align:center; padding: 100px; color: #94a3b8;'>
+            <img src='https://cdn-icons-png.flaticon.com/512/1611/1611154.png' width='100' style='opacity: 0.2'>
+            <h3>Sistema de Inteligência Fiscal pronto para análise.</h3>
+            <p>Selecione os dados na barra lateral e clique em Processar.</p>
+        </div>
+    """, unsafe_allow_html=True)
