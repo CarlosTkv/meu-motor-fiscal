@@ -1,233 +1,228 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px  # CORREÇÃO: Importação necessária para o gráfico
 import base64
 from datetime import datetime
 from fpdf import FPDF
 
 # =====================================================================
-# 1. CORE CONFIGURATION & LUXURY DESIGN SYSTEM
+# 1. SISTEMA DE DESIGN (MODERNO & EXECUTIVO)
 # =====================================================================
-st.set_page_config(page_title="TaxWizard Ultra | Enterprise 2026", layout="wide", page_icon="💎")
+st.set_page_config(page_title="TaxWizard Master 2026", layout="wide", page_icon="⚡")
 
-def inject_ultra_css():
+def aplicar_design_premium():
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         
-        :root {
-            --primary: #6366f1; --primary-light: #e0e7ff;
-            --success: #10b981; --warning: #f59e0b; --error: #ef4444;
-            --slate-900: #0f172a; --slate-700: #334155; --slate-100: #f1f5f9;
-        }
+        html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; color: #1e293b; }
+        .stApp { background: #f8fafc; }
 
-        html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; color: var(--slate-900); }
-        .stApp { background: #fafafa; }
-
-        /* Bento Grid Style Cards */
+        /* Bento Grid Style */
         .bento-card {
-            background: white; border-radius: 24px; padding: 1.8rem;
-            border: 1px solid #eef2f6; box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-            transition: all 0.3s ease; height: 100%;
+            background: white; border-radius: 20px; padding: 25px;
+            border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+            transition: all 0.3s ease; margin-bottom: 20px;
         }
-        .bento-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(0,0,0,0.06); border-color: var(--primary); }
+        .bento-card:hover { border-color: #6366f1; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
 
-        /* Status & Badges */
-        .status-pill {
-            display: inline-flex; align-items: center; padding: 4px 12px;
-            border-radius: 99px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
-        }
-        .pill-blue { background: var(--primary-light); color: var(--primary); border: 1px solid #c7d2fe; }
+        .label-tech { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .value-tech { font-size: 20px; font-weight: 800; color: #0f172a; }
         
-        /* Typography */
-        .label-tech { font-size: 11px; font-weight: 700; color: var(--slate-700); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-        .value-tech { font-size: 20px; font-weight: 800; color: var(--slate-900); }
-        .legal-box { 
-            font-size: 13px; line-height: 1.6; color: #475569; background: #f8fafc; 
-            padding: 1.2rem; border-radius: 16px; border-left: 6px solid var(--primary);
+        .justificativa-box { 
+            font-size: 13px; line-height: 1.6; color: #334155; background: #f1f5f9; 
+            padding: 15px; border-radius: 12px; border-left: 5px solid #6366f1; margin-top: 10px;
+        }
+        
+        .status-badge {
+            background: #e0e7ff; color: #4338ca; padding: 4px 12px; border-radius: 99px;
+            font-size: 11px; font-weight: 700; border: 1px solid #c7d2fe;
         }
         </style>
     """, unsafe_allow_html=True)
 
-inject_ultra_css()
+aplicar_design_premium()
 
 # =====================================================================
-# 2. INTELLIGENCE ENGINE (DATABASE & LAWS 2026)
+# 2. MOTOR DE INTELIGÊNCIA (BASES LEGAIS VIGENTES EM 2026)
 # =====================================================================
 class TaxIntelligence:
-    NCM_DATA = {
-        "85171300": {"desc": "Smartphone / Terminal Celular", "mva": 40.0, "ipi": 15.0, "is": 0.0},
-        "22030000": {"desc": "Cerveja de Malte", "mva": 140.0, "ipi": 6.0, "is": 15.0}, # Imposto Seletivo Ativo em 2026
-        "84713012": {"desc": "Notebook / Laptop", "mva": 35.0, "ipi": 0.0, "is": 0.0}
+    # Simulação de Base de Dados Robusta
+    NCM_DATABASE = {
+        "85171300": {"desc": "Smartphone / Terminal Celular", "mva_orig": 40.0, "ipi": 15.0},
+        "84713012": {"desc": "Notebook / Computador Portátil", "mva_orig": 35.0, "ipi": 0.0},
+        "22030000": {"desc": "Cerveja de Malte", "mva_orig": 140.0, "ipi": 6.0},
     }
     
-    LC116_DATA = {
-        "7.02": {"desc": "Construção Civil / Obras", "aliq": 5.0, "ret": True, "art": "Art. 3, III"},
-        "1.05": {"desc": "Software SaaS", "aliq": 2.0, "ret": False, "art": "Art. 3, Caput"},
-        "11.02": {"desc": "Vigilância", "aliq": 5.0, "ret": True, "art": "Art. 3, XVII"}
+    LC116_DATABASE = {
+        "7.02": {"desc": "Construção Civil / Obras", "aliq": 5.0, "retencao_local": True, "base": "Art. 3, III LC 116"},
+        "1.05": {"desc": "Licenciamento de Software (SaaS)", "aliq": 2.0, "retencao_local": False, "base": "Art. 3, Caput LC 116"},
+        "11.02": {"desc": "Vigilância e Segurança", "aliq": 5.0, "retencao_local": True, "base": "Art. 3, XVII LC 116"},
     }
 
 # =====================================================================
-# 3. MÓDULO DE CÁLCULO E TRANSIÇÃO (MATEMÁTICA FISCAL)
+# 3. LÓGICA DE CÁLCULO TÉCNICO (MVA, ST, DIFAL, CBS, IBS)
 # =====================================================================
-def processar_malha(d):
-    # Regras vigentes em 24/08/2026
+def executar_calculo_fiscal(d):
     v = d['valor']
-    res = {
-        "cbs": v * 0.001, "ibs": v * 0.001, # Fase de teste transição
-        "is": 0.0, "detalhes": {}
-    }
+    # REGRAS VIGENTES EM 24/08/2026 (Transição Reforma Tributária)
+    cbs_2026 = v * 0.001 # Alíquota de teste 0,1%
+    ibs_2026 = v * 0.001 # Alíquota de teste 0,1%
     
-    aliq_inter, aliq_intra = (12.0, 18.0) if d['uf_o'] != d['uf_d'] else (18.0, 18.0)
+    aliq_inter = 12.0 if d['uf_o'] != d['uf_d'] else 18.0
+    aliq_intra = 18.0 # Média Brasil em 2026
 
-    if d['tipo'] == "PRODUTO":
-        info = TaxIntelligence.NCM_DATA.get(d['cod'], {"desc": "Produto Geral", "mva": 50.0, "ipi": 0.0, "is": 0.0})
-        # Cálculo ST com IPI compondo base
+    if d['natureza'] == "PRODUTO":
+        info = TaxIntelligence.NCM_DATABASE.get(d['codigo'], {"desc": "Produto Geral", "mva_orig": 50.0, "ipi": 0.0})
         v_ipi = v * (info['ipi'] / 100)
-        v_is = v * (info['is'] / 100) if info['is'] > 0 else 0.0
         
-        mva_ajust = ((1 + (info['mva']/100)) * (1 - aliq_inter/100) / (1 - aliq_intra/100)) - 1
-        base_st = (v + v_ipi + v_is) * (1 + (mva_ajust if aliq_inter < aliq_intra else info['mva']/100))
+        # MVA Ajustada: [ (1+MVA_orig) * (1-AliqInter) / (1-AliqIntra) ] - 1
+        mva_ajustada = ((1 + (info['mva_orig']/100)) * (1 - aliq_inter/100) / (1 - aliq_intra/100)) - 1
+        mva_f = mva_ajustada if d['uf_o'] != d['uf_d'] else info['mva_orig']/100
+        
+        # Cálculo ST Base Dupla
+        base_st = (v + v_ipi) * (1 + mva_f)
         icms_prop = (v + v_ipi) * (aliq_inter / 100)
         v_st = max(0, (base_st * (aliq_intra / 100)) - icms_prop)
         
-        res.update({
-            "nome": info['desc'], "ipi": v_ipi, "st": v_st, "is": v_is, "icms_p": icms_prop,
-            "base_st": base_st, "mva_ajust": mva_ajust, "aliq_inter": aliq_inter, "aliq_intra": aliq_intra
-        })
+        # Cálculo DIFAL (EC 87/15)
+        v_difal = (v + v_ipi) * ((aliq_intra - aliq_inter) / 100)
+
+        return {
+            "nome": info['desc'], "ipi": v_ipi, "st": v_st, "difal": v_difal, "cbs": cbs_2026, "ibs": ibs_2026,
+            "mva_f": mva_f, "base_st": base_st, "icms_p": icms_prop, "aliq_inter": aliq_inter, "aliq_intra": aliq_intra,
+            "justificativa_icms": f"CST 010 aplicado. MVA Ajustada de {mva_f*100:.2f}% calculada sobre a base composta por Valor + IPI.",
+            "justificativa_pis": "CST 01. Alíquota mantida durante a transição para a CBS conforme EC 132/23."
+        }
     else:
-        info = TaxIntelligence.LC116_DATA.get(d['cod'], {"desc": "Serviço Especializado", "aliq": 5.0, "ret": False})
-        iss_r = (d['cid_o'] != d['cid_p']) and info['ret']
-        res.update({
-            "nome": info['desc'], "iss_v": v * (info['aliq']/100), "retencao": iss_r,
-            "aliq_iss": info['aliq'], "local": d['cid_p'] if iss_r else d['cid_o']
-        })
-    return res
+        info = TaxIntelligence.LC116_DATABASE.get(d['codigo'], {"desc": "Serviço Especializado", "aliq": 5.0, "retencao_local": False})
+        iss_retido = (d['cid_o'] != d['cid_p']) and info['retencao_local']
+        iss_v = v * (info['aliq'] / 100)
+        
+        return {
+            "nome": info['desc'], "iss_v": iss_v, "cbs": cbs_2026, "ibs": ibs_2026, "retencao": iss_retido,
+            "local_recolhimento": d['cid_p'] if iss_retido else d['cid_o'],
+            "justificativa_iss": f"ISS devido em {d['cid_p'] if iss_retido else d['cid_o']} conforme {info.get('base', 'LC 116/03')}.",
+            "justificativa_pis": "Regime de transição. CBS a 0,1% compensável no PIS/COFINS."
+        }
 
 # =====================================================================
-# 4. SIDEBAR - CONTROLE DE NAVEGAÇÃO E INPUTS
+# 4. INTERFACE DO USUÁRIO (WIZARD)
 # =====================================================================
 with st.sidebar:
-    st.markdown("<h1 style='color:#6366f1;'>TaxWizard <span style='color:#0f172a'>Pro</span></h1>", unsafe_allow_html=True)
-    st.markdown("<p style='font-size:11px; margin-top:-20px; font-weight:700; color:#94a3b8;'>SaaS ENTERPRISE • AUG 2026</p>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color:#6366f1;'>TaxWizard Pro</h2>", unsafe_allow_html=True)
+    st.markdown(f"<span class='status-badge'>VIGÊNCIA: 24/08/2026</span>", unsafe_allow_html=True)
     
-    tab_op = st.radio("Selecione o Objeto", ["📦 PRODUTO (NCM)", "🛠️ SERVIÇO (LC116)"])
+    natureza = st.radio("Natureza da Operação", ["PRODUTO (ICMS/IPI)", "SERVIÇO (ISS)"])
     
     st.divider()
-    with st.expander("🌍 Geografia e Operação", expanded=True):
-        uf_origem = st.selectbox("UF Origem", ["SP", "RJ", "MG", "PR", "SC", "RS"])
-        uf_destino = st.selectbox("UF Destino", ["RJ", "SP", "MG", "PR", "SC", "RS"])
-        if tab_op == "🛠️ SERVIÇO (LC116)":
-            cid_orig = st.text_input("Município Sede", "São Paulo")
-            cid_prest = st.text_input("Município Prestação", "Rio de Janeiro")
-            cid_tomad = st.text_input("Município Tomador", "Belo Horizonte")
-        else:
-            cod_id = st.text_input("NCM (8 dígitos)", "85171300")
-            cid_orig = cid_prest = cid_tomad = "N/A"
-
-    with st.expander("💰 Valores e Regime", expanded=True):
-        if tab_op == "🛠️ SERVIÇO (LC116)":
-            cod_id = st.text_input("Código LC 116", "7.02")
-        valor_nf = st.number_input("Valor Bruto (R$)", value=50000.0)
-        regime = st.selectbox("Regime Empresa", ["LUCRO REAL", "LUCRO PRESUMIDO", "SIMPLES NACIONAL"])
+    cod_input = st.text_input("NCM ou Código Atividade (LC 116)", value="85171300" if "PRODUTO" in natureza else "7.02")
+    v_nota = st.number_input("Valor da Nota (R$)", value=10000.0)
+    
+    st.markdown("### Geografia")
+    uf_o = st.selectbox("UF Origem", ["SP", "RJ", "MG", "PR", "SC", "RS"])
+    uf_d = st.selectbox("UF Destino", ["RJ", "SP", "MG", "PR", "SC", "RS"])
+    
+    if "SERVIÇO" in natureza:
+        cid_o = st.text_input("Cidade Sede Empresa", "São Paulo")
+        cid_d = st.text_input("Cidade Tomador (Cliente)", "Rio de Janeiro")
+        cid_p = st.text_input("Cidade Local da Prestação", "Rio de Janeiro")
+    else:
+        cid_o = cid_d = cid_p = "N/A"
 
     st.divider()
-    gerar = st.button("⚡ ANALISAR AGORA", use_container_width=True)
+    reg_o = st.selectbox("Regime Empresa", ["LUCRO REAL", "LUCRO PRESUMIDO", "SIMPLES NACIONAL"])
+    reg_d = st.selectbox("Regime Destinatário", ["CONTRIBUINTE", "NÃO CONTRIBUINTE / PF"])
+    
+    btn_analisar = st.button("🚀 EXECUTAR AUDITORIA FISCAL", use_container_width=True)
 
 # =====================================================================
-# 5. DASHBOARD - O "PERFEITO" VISUAL
+# 5. RESULTADOS E DASHBOARDS
 # =====================================================================
-if gerar:
-    params = {
-        'tipo': "PRODUTO" if "📦" in tab_op else "SERVIÇO",
-        'cod': cod_id, 'valor': valor_nf, 'uf_o': uf_origem, 'uf_d': uf_destino,
-        'cid_o': cid_orig, 'cid_p': cid_prest, 'cid_t': cid_tomad
+if btn_analisar:
+    inputs = {
+        'natureza': "PRODUTO" if "PRODUTO" in natureza else "SERVICO",
+        'codigo': cod_input, 'valor': v_nota, 'uf_o': uf_o, 'uf_d': uf_d,
+        'cid_o': cid_o, 'cid_p': cid_p, 'reg_o': reg_o, 'reg_d': reg_d
     }
-    audit = processar_malha(params)
-
-    # HEADER DINÂMICO
-    st.markdown(f"<h1>{audit['nome']}</h1>", unsafe_allow_html=True)
-    st.markdown(f"<span class='status-pill pill-blue'>AUDITORIA EM 24/08/2026 • ID {datetime.now().strftime('%Y%m%d%H%M')}</span>", unsafe_allow_html=True)
     
-    st.divider()
-
-    # BENTO GRID - ROW 1
-    col1, col2, col3 = st.columns([1.2, 1, 1])
+    res = executar_calculo_fiscal(inputs)
     
-    with col1:
+    st.markdown(f"# {res['nome']}")
+    st.markdown("---")
+
+    tab_analise, tab_calculo, tab_relatorio = st.tabs(["📋 ANÁLISE TÉCNICA", "🧮 MEMÓRIA DE CÁLCULO", "📊 DASHBOARD & PDF"])
+
+    with tab_analise:
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown('<div class="bento-card">', unsafe_allow_html=True)
+            st.markdown('<p class="label-tech">Principal (ICMS / ISS)</p>', unsafe_allow_html=True)
+            if inputs['natureza'] == "PRODUTO":
+                st.write(f"**CFOP Sugerido:** {'6.403' if uf_o != uf_d else '5.403'}")
+                st.write(f"**CST Sugerido:** 010")
+                st.markdown(f'<div class="justificativa-box">{res["justificativa_icms"]}</div>', unsafe_allow_html=True)
+            else:
+                st.write(f"**Local Devido:** {res['local_recolhimento']}")
+                st.write(f"**Retenção ISS:** {'SIM' if res['retencao'] else 'NÃO'}")
+                st.markdown(f'<div class="justificativa-box">{res["justificativa_iss"]}</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        with c2:
+            st.markdown('<div class="bento-card">', unsafe_allow_html=True)
+            st.markdown('<p class="label-tech">PIS / COFINS & CBS</p>', unsafe_allow_html=True)
+            st.write(f"**CBS (Transição):** R$ {res['cbs']:,.2f}")
+            st.write(f"**IBS (Transição):** R$ {res['ibs']:,.2f}")
+            st.markdown(f'<div class="justificativa-box">{res["justificativa_pis"]}</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab_calculo:
         st.markdown('<div class="bento-card">', unsafe_allow_html=True)
-        st.markdown('<p class="label-tech">Principal (ICMS / ISS)</p>', unsafe_allow_html=True)
-        if params['tipo'] == "PRODUTO":
-            st.markdown(f"<p class='tech-value'>CFOP {'6403' if uf_origem != uf_destino else '5403'}</p>", unsafe_allow_html=True)
-            st.markdown(f"<p class='label-tech'>ICMS Próprio: R$ {audit['icms_p']:,.2f}</p>", unsafe_allow_html=True)
-            st.markdown(f"<div class='legal-box'><b>Fundamentação:</b> Mercadoria sujeita ao regime de ST conforme Convênio ICMS 142/18. Base de cálculo composta por IPI + IS conforme legislação de 2026.</div>", unsafe_allow_html=True)
+        st.write("### Detalhamento Matemático")
+        if inputs['natureza'] == "PRODUTO":
+            cc1, cc2, cc3 = st.columns(3)
+            cc1.metric("Base de Cálculo ST", f"R$ {res['base_st']:,.2f}")
+            cc2.metric("MVA Utilizada", f"{res['mva_f']*100:.2f}%")
+            cc3.metric("Valor ICMS-ST", f"R$ {res['st']:,.2f}")
+            
+            if "NÃO CONTRIBUINTE" in reg_d:
+                st.info(f"DIFAL Estimado (EC 87/15): R$ {res['difal']:,.2f}")
         else:
-            st.markdown(f"<p class='tech-value'>{audit['local']}</p>", unsafe_allow_html=True)
-            st.markdown(f"<p class='label-tech'>ISS Due To: {'LOCAL DA PRESTAÇÃO' if audit['retencao'] else 'SEDE DO PRESTADOR'}</p>", unsafe_allow_html=True)
-            st.markdown(f"<div class='legal-box'><b>LC 116/03:</b> O serviço {cod_id} é exceção à regra geral. Imposto devido em {audit['local']} conforme Art. 3º.</div>", unsafe_allow_html=True)
+            st.metric("Total ISS a Recolher", f"R$ {res['iss_v']:,.2f}")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    with col2:
-        st.markdown('<div class="bento-card">', unsafe_allow_html=True)
-        st.markdown('<p class="label-tech">Transição Reforma (CBS / IBS)</p>', unsafe_allow_html=True)
-        st.markdown(f"<p class='tech-value' style='color:#6366f1'>R$ {audit['cbs'] + audit['ibs']:,.2f}</p>", unsafe_allow_html=True)
-        st.write(f"🔹 CBS (0,1%): R$ {audit['cbs']:.2f}")
-        st.write(f"🔹 IBS (0,1%): R$ {audit['ibs']:.2f}")
-        st.markdown(f"<div class='legal-box' style='border-left-color:#10b981'><b>Status:</b> Alíquotas de teste vigentes para compensação futura.</div>", unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with col3:
-        st.markdown('<div class="bento-card">', unsafe_allow_html=True)
-        st.markdown('<p class="label-tech">Imposto Seletivo (IS)</p>', unsafe_allow_html=True)
-        st.markdown(f"<p class='tech-value' style='color:#ef4444'>R$ {audit['is']:,.2f}</p>", unsafe_allow_html=True)
-        st.write(f"Incidência: {'Sim' if audit['is'] > 0 else 'Não'}")
-        st.markdown(f"<div class='legal-box' style='border-left-color:#ef4444'><b>Impacto:</b> Seletivo incidindo sobre valor bruto para desestimular consumo.</div>", unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # ROW 2 - MEMÓRIA DE CÁLCULO E GRÁFICO
-    st.markdown("### 🧮 Memória de Cálculo & Planejamento")
-    col_calc, col_viz = st.columns([1.5, 1])
-    
-    with col_calc:
-        st.markdown('<div class="bento-card">', unsafe_allow_html=True)
-        if params['tipo'] == "PRODUTO":
-            st.write(f"**Base ST (Base Dupla):** R$ {audit['base_st']:,.2f}")
-            st.write(f"**MVA Ajustada:** {audit['mva_ajust']*100:.2f}%")
-            st.code(f"Step 1: (Valor + IPI + IS) * (1 + MVA) = Base ST\nStep 2: (Base ST * {audit['aliq_intra']}%) - ICMS Próprio = R$ {audit['st']:,.2f}")
-        else:
-            st.write(f"**Base de Cálculo ISS:** R$ {valor_nf:,.2f}")
-            st.code(f"Step 1: Base * {audit['aliq_iss']}% = R$ {audit['iss_v']:,.2f}\nRetenção: {'Sim (Tomador recolhe)' if audit['retencao'] else 'Não (Prestador recolhe)'}")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with col_viz:
-        # Gráfico Comparativo 2026
-        df_viz = pd.DataFrame({
-            "Tributo": ["ICMS/ISS", "PIS/COF", "IPI/IS", "IBS/CBS"],
-            "Valor (R$)": [audit.get('icms_p', audit.get('iss_v', 0)), valor_nf*0.09, audit.get('ipi', 0)+audit['is'], audit['cbs']+audit['ibs']]
-        })
-        fig = px.pie(df_viz, values='Valor (R$)', names='Tributo', hole=.6, color_discrete_sequence=px.colors.qualitative.Prism)
-        fig.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0), height=250)
+    with tab_relatorio:
+        # Gráfico Corrigido
+        st.subheader("Composição da Carga Tributária")
+        
+        # Preparação de dados para o gráfico
+        labels = ['Imposto Principal', 'CBS (Reforma)', 'IBS (Reforma)']
+        valores = [res.get('st', res.get('iss_v', 0)), res['cbs'], res['ibs']]
+        
+        fig = px.pie(names=labels, values=valores, hole=0.5, color_discrete_sequence=px.colors.qualitative.Prism)
         st.plotly_chart(fig, use_container_width=True)
-
-    # DOWNLOAD REPORT (PDF ENGINE)
-    st.divider()
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(200, 10, "AUDITORIA TÉCNICA TAXWIZARD ULTRA", ln=True, align='C')
-    pdf.set_font("Arial", "", 12)
-    pdf.ln(10)
-    pdf.multi_cell(0, 10, f"Operação: {params['tipo']} - {audit['nome']}\nData: 24/08/2026\nValor: R$ {valor_nf:,.2f}\nTotal Tributos: R$ {sum(df_viz['Valor (R$)']):,.2f}")
-    
-    pdf_output = pdf.output(dest='S').encode('latin-1')
-    b64_pdf = base64.b64encode(pdf_output).decode()
-    st.markdown(f'<a href="data:application/pdf;base64,{b64_pdf}" download="tax_audit_2026.pdf" style="text-decoration:none; background:var(--slate-900); color:white; padding:12px 30px; border-radius:12px; font-weight:700;">📥 BAIXAR RELATÓRIO PDF COMPLETO</a>', unsafe_allow_html=True)
+        
+        # PDF EXPORT
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", 'B', 16)
+        pdf.cell(200, 10, "RELATORIO DE AUDITORIA FISCAL 2026", ln=True, align='C')
+        pdf.ln(10)
+        pdf.set_font("Arial", '', 12)
+        pdf.cell(200, 10, f"Objeto: {res['nome']} | Valor: R$ {v_nota:,.2f}", ln=True)
+        pdf.cell(200, 10, f"Origem: {uf_o} | Destino: {uf_d}", ln=True)
+        
+        pdf_out = pdf.output(dest='S').encode('latin-1')
+        b64_pdf = base64.b64encode(pdf_out).decode()
+        href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="auditoria_fiscal_2026.pdf" style="display:inline-block; padding:12px 24px; background-color:#6366f1; color:white; text-decoration:none; border-radius:10px; font-weight:bold;">📥 BAIXAR RELATÓRIO COMPLETO (PDF)</a>'
+        st.markdown(href, unsafe_allow_html=True)
 
 else:
     st.markdown("""
-        <div style='text-align:center; padding: 150px; opacity:0.4;'>
-            <img src='https://cdn-icons-png.flaticon.com/512/1162/1162456.png' width='80'>
-            <h2>Tax Engine Ready</h2>
-            <p>Selecione os parâmetros técnicos e inicie o motor de auditoria.</p>
+        <div style='text-align:center; padding: 100px; opacity:0.3;'>
+            <img src='https://cdn-icons-png.flaticon.com/512/1162/1162456.png' width='100'>
+            <h2>Motor Fiscal Pronto para Auditoria</h2>
+            <p>Selecione os parâmetros e clique em Executar.</p>
         </div>
     """, unsafe_allow_html=True)
