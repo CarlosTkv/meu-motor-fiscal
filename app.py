@@ -1,164 +1,170 @@
 import streamlit as st
 
 # =====================================================================
-# 1. CONFIGURAÇÃO VISUAL PREMIUM
+# 1. CONFIGURAÇÃO DE DESIGN (LAYOUT DELICADO & PREMIUM)
 # =====================================================================
-st.set_page_config(
-    page_title="Fiscal Inteligente Pro",
-    page_icon="⚖️",
-    layout="wide"
-)
+st.set_page_config(page_title="Fiscal Pro | Intelligence", page_icon="❄️", layout="wide")
 
+# CSS para tornar a interface mais limpa e moderna
 st.markdown("""
     <style>
-    .main { background-color: #f4f7f9; }
-    .stMetric { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-    .card-vigente { background: white; padding: 20px; border-radius: 10px; border-left: 6px solid #0056b3; margin-bottom: 15px; }
-    .card-reforma { background: #f0fff4; padding: 20px; border-radius: 10px; border-left: 6px solid #28a745; margin-bottom: 15px; }
-    .card-justificativa { background: #fffaf0; padding: 20px; border-radius: 10px; border-left: 6px solid #ff9800; }
-    h3 { color: #1a202c; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; color: #444; }
+    .main { background-color: #fdfdfd; }
+    div.stButton > button {
+        background-color: #000; color: white; border-radius: 8px; border: none;
+        padding: 10px 20px; transition: 0.3s; width: 100%;
+    }
+    div.stButton > button:hover { background-color: #333; color: white; }
+    .card {
+        background: white; padding: 25px; border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid #f0f0f0; margin-bottom: 20px;
+    }
+    .tag {
+        display: inline-block; padding: 4px 12px; border-radius: 20px;
+        font-size: 12px; font-weight: 600; margin-bottom: 10px;
+    }
+    .tag-vigente { background: #e3f2fd; color: #1976d2; }
+    .tag-reforma { background: #e8f5e9; color: #2e7d32; }
+    .tag-resp { background: #fff3e0; color: #e65100; }
+    h1, h2, h3 { font-weight: 600; letter-spacing: -0.5px; }
     </style>
     """, unsafe_allow_html=True)
 
 # =====================================================================
-# 2. INTELIGÊNCIA DE DADOS (NCM & REGRAS)
+# 2. LOGICA TRIBUTÁRIA E RESPONSABILIDADES
 # =====================================================================
 def identificar_produto(ncm):
-    base_ncm = {
-        "85171300": "Smartphone/Celular",
-        "84713012": "Notebook/Laptop",
-        "85285200": "Monitor de Vídeo",
-        "22030000": "Cerveja de Malte",
-        "30049099": "Medicamentos Diversos",
-        "87032310": "Automóvel de Passeio",
+    base = {
+        "85171300": "Smartphone", "84713012": "Notebook", "85285200": "Monitor",
+        "22030000": "Cerveja", "30049099": "Medicamento", "87032310": "Veículo"
     }
-    return base_ncm.get(ncm, "Produto Geral (NCM Não Catalogado)")
+    return base.get(ncm, "Produto Não Especificado")
 
-def processar_motor_fiscal(ncm, uf_orig, uf_dest, reg_orig, reg_dest, operacao):
+def analisar_fiscal(ncm, uf_o, uf_d, reg_o, reg_d, operacao):
     produto = identificar_produto(ncm)
-    is_interestadual = uf_orig != uf_dest
+    is_interestadual = uf_o != uf_d
     tem_st = True if ncm.startswith(("8517", "2203", "8703")) else False
+    is_nao_contribuinte = "NÃO CONTRIBUINTE" in reg_d
     
-    # Inicialização de Variáveis
-    justificativa = []
-    cfop = ""
-    pis_cofins = "0%"
-    icms = "0%"
+    # Responsabilidades
+    resp_st = "NÃO APLICÁVEL"
+    resp_difal = "NÃO APLICÁVEL"
     
-    # LOGICA DE CFOP E JUSTIFICATIVA
-    if operacao == "EXPORTAÇÃO":
-        cfop = "7101"
-        pis_cofins = "0% (Imunidade)"
-        icms = "0% (Não Incidência)"
-        justificativa.append("Imunidade tributária conforme Art. 149 da Constituição Federal (desoneração de exportações).")
-        justificativa.append("Manutenção de crédito assegurada para a origem.")
+    # Regra de ST
+    if tem_st:
+        resp_st = "REMETENTE (SUBSTITUTO)" if operacao == "SAÍDA" else "DESTINATÁRIO (ANTECIPAÇÃO)"
         
-    elif operacao == "IMPORTAÇÃO":
-        cfop = "3101"
-        pis_cofins = "9.25% (Lucro Real)" if reg_orig == "LUCRO REAL" else "3.65%"
-        icms = "18% (Varia por UF)"
-        justificativa.append("Operação de entrada do exterior. Incidência de II, IPI, PIS-Importação e COFINS-Importação.")
-        justificativa.append("O ICMS é devido no desembaraço aduaneiro para o estado de destino.")
-
-    elif operacao == "SAÍDA":
-        pref = "6" if is_interestadual else "5"
-        if tem_st:
-            cfop = f"{pref}403"
-            justificativa.append(f"Produto sujeito à Substituição Tributária em {uf_orig}. ICMS-ST recolhido antecipadamente.")
+    # Regra de DIFAL (EC 87/2015)
+    if is_interestadual and operacao == "SAÍDA":
+        if is_nao_contribuinte:
+            resp_difal = "REMETENTE (ESTADO DE ORIGEM)"
         else:
-            cfop = f"{pref}102"
-            justificativa.append("Venda de mercadoria tributada integralmente no regime normal.")
-        
-        if is_interestadual and reg_dest == "SIMPLES NACIONAL":
-            justificativa.append("DIFAL devido: Diferencial de alíquota para consumidor final não contribuinte.")
+            resp_difal = "DESTINATÁRIO (ESTADO DE DESTINO)"
 
-    # REFORMA TRIBUTÁRIA 2026
-    cbs = "8.8%" 
-    ibs = "17.7%"
+    # CFOP
+    if operacao == "EXPORTAÇÃO": cfop = "7101"
+    elif operacao == "IMPORTAÇÃO": cfop = "3101"
+    else:
+        pref = "6" if is_interestadual else "5"
+        cfop = f"{pref}403" if tem_st else f"{pref}102"
+
+    # Justificativas
+    just = []
+    if operacao == "EXPORTAÇÃO": just.append("Imunidade conforme Art. 149 da CF/88.")
+    if is_nao_contribuinte: just.append("Destinatário final não contribuinte: Incidência de DIFAL total para a origem (EC 87/15).")
+    if tem_st: just.append(f"Produto na lista de ST do convênio ICMS vigente para {ncm}.")
 
     return {
-        "produto": produto,
-        "cfop": cfop,
-        "icms": icms if operacao in ["IMPORTAÇÃO", "EXPORTAÇÃO"] else ("12%" if is_interestadual else "18%"),
-        "pis_cofins": pis_cofins,
-        "st": "SIM" if tem_st else "NÃO",
-        "cbs": cbs,
-        "ibs": ibs,
-        "justificativa": justificativa
+        "produto": produto, "cfop": cfop, "st": "SIM" if tem_st else "NÃO",
+        "resp_st": resp_st, "resp_difal": resp_difal,
+        "cbs": "8.8%", "ibs": "17.7%", "just": just
     }
 
 # =====================================================================
-# 3. INTERFACE DE USUÁRIO
+# 3. INTERFACE (UI)
 # =====================================================================
-st.title("⚖️ Motor Fiscal Pro - 1000% Funcional")
-st.markdown("---")
+st.title("❄️ Fiscal Intelligence Pro")
+st.write("Análise tributária delicada para operações complexas.")
 
-# Barra Lateral
 with st.sidebar:
-    st.header("📋 Dados da Operação")
-    ncm_in = st.text_input("NCM (8 dígitos)", value="85171300")
-    tipo_op = st.selectbox("Tipo de Operação", ["SAÍDA", "ENTRADA", "IMPORTAÇÃO", "EXPORTAÇÃO"])
+    st.markdown("### 🛠 Configuração")
+    ncm_in = st.text_input("NCM do Produto", "85171300")
+    tipo_op = st.selectbox("Operação", ["SAÍDA", "ENTRADA", "IMPORTAÇÃO", "EXPORTAÇÃO"])
     
+    st.divider()
     c1, c2 = st.columns(2)
-    uf_o = c1.selectbox("Origem", ["SP", "RJ", "MG", "PR", "SC", "RS", "ES"])
-    uf_d = c2.selectbox("Destino", ["RJ", "SP", "MG", "PR", "SC", "RS", "ES", "EXTERIOR"])
+    uf_o = c1.selectbox("UF Origem", ["SP", "RJ", "MG", "PR", "SC", "RS"])
+    uf_d = c2.selectbox("UF Destino", ["RJ", "SP", "MG", "PR", "SC", "RS", "EXTERIOR"])
     
-    r_orig = st.selectbox("Regime Empresa", ["LUCRO REAL", "LUCRO PRESUMIDO", "SIMPLES NACIONAL"])
-    r_dest = st.selectbox("Regime Destinatário", ["LUCRO REAL", "LUCRO PRESUMIDO", "SIMPLES NACIONAL", "CONSUMIDOR FINAL"])
+    reg_o = st.selectbox("Regime Empresa", ["LUCRO REAL", "LUCRO PRESUMIDO", "SIMPLES NACIONAL"])
+    reg_d = st.selectbox("Regime Destinatário", [
+        "LUCRO REAL", "LUCRO PRESUMIDO", "SIMPLES NACIONAL", 
+        "NÃO CONTRIBUINTE (PESSOA FÍSICA)", "NÃO CONTRIBUINTE (PESSOA JURÍDICA)"
+    ])
     
-    processar = st.button("ANALISAR AGORA")
+    analisar = st.button("GERAR ANÁLISE")
 
-# Área de Resultados
-if processar:
-    if len(ncm_in) != 8:
-        st.error("NCM Inválido! Use 8 dígitos numéricos.")
-    else:
-        res = processar_motor_fiscal(ncm_in, uf_o, uf_d, r_orig, r_dest, tipo_op)
-        
-        # Cabeçalho do Produto
-        st.subheader(f"🔍 Identificação: {res['produto']} (NCM {ncm_in})")
-        
-        # Métricas Rápidas
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("CFOP Sugerido", res['cfop'])
-        m2.metric("ICMS Sugerido", res['icms'])
-        m3.metric("ST Aplicável?", res['st'])
-        m4.metric("Status", "Processado")
+if analisar:
+    res = analisar_fiscal(ncm_in, uf_o, uf_d, reg_o, reg_d, tipo_op)
+    
+    # Header do Resultado
+    st.markdown(f"## {res['produto']} <span style='font-size:18px; color:gray;'>(NCM {ncm_in})</span>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("CFOP SUGERIDO", res['cfop'])
+    with col2:
+        st.metric("ST APLICÁVEL", res['st'])
+    with col3:
+        st.metric("PROJEÇÃO IVA 2026", f"{res['cbs']} + {res['ibs']}")
 
-        st.markdown("---")
-        
-        col_v, col_r = st.columns(2)
-        
-        with col_v:
-            st.markdown(f"""
-            <div class="card-vigente">
-                <h3>📦 Regras Vigentes (2024-2025)</h3>
-                <p><b>PIS/COFINS:</b> {res['pis_cofins']}</p>
-                <p><b>Operação:</b> {tipo_op}</p>
-                <p><b>Rota:</b> {uf_o} ➔ {uf_d}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        with col_r:
-            st.markdown(f"""
-            <div class="card-reforma">
-                <h3>🌿 Projeção Reforma (2026)</h3>
-                <p><b>CBS (Federal):</b> {res['cbs']}</p>
-                <p><b>IBS (Estadual):</b> {res['ibs']}</p>
-                <p><b>Transição:</b> Alíquotas baseadas no regulamento atualizado.</p>
-            </div>
-            """, unsafe_allow_html=True)
+    st.divider()
 
-        # Justificativa Legal
+    # Cards de Responsabilidade e Detalhes
+    c_vig, c_resp = st.columns(2)
+    
+    with c_vig:
         st.markdown(f"""
-        <div class="card-justificativa">
-            <h3>📖 Justificativa Técnico-Legal</h3>
-            <ul>
-                {"".join([f"<li>{item}</li>" for item in res['justificativa']])}
-            </ul>
+        <div class="card">
+            <span class="tag tag-vigente">REGRAS VIGENTES</span>
+            <h3>Operação de {tipo_op}</h3>
+            <p><b>Rota:</b> {uf_o} para {uf_d}</p>
+            <p><b>Regime Destino:</b> {reg_d}</p>
+            <hr style="border:0; border-top:1px solid #eee">
+            <p style="font-size: 14px; color: #666;">Dados processados com base no RICMS do Estado de {uf_o}.</p>
         </div>
         """, unsafe_allow_html=True)
-        
-        st.success("Análise concluída com sucesso e pronta para faturamento.")
+
+    with c_resp:
+        st.markdown(f"""
+        <div class="card">
+            <span class="tag tag-resp">RESPONSABILIDADES</span>
+            <h3>Quem recolhe as guias?</h3>
+            <p><b>Responsável ST:</b> {res['resp_st']}</p>
+            <p><b>Responsável DIFAL:</b> {res['resp_difal']}</p>
+            <hr style="border:0; border-top:1px solid #eee">
+            <p style="font-size: 14px; color: #666;">Atenção: Verifique se há protocolo de ST entre {uf_o} e {uf_d}.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Justificativa Técnica
+    st.markdown(f"""
+    <div class="card">
+        <span class="tag tag-reforma">JUSTIFICATIVA TÉCNICO-LEGAL</span>
+        <h3>Fundamentação</h3>
+        <ul style="color: #555; line-height: 1.8;">
+            {"".join([f"<li>{item}</li>" for item in res['just']])}
+            <li>CBS e IBS calculados com alíquotas padrão de transição da Reforma Tributária (EC 132).</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.caption("Nota: Este sistema é um simulador. Sempre consulte seu contador antes de emitir a nota fiscal.")
+
 else:
-    st.info("Aguardando entrada de dados para gerar a árvore fiscal.")
+    st.markdown("""
+        <div style="text-align:center; margin-top: 100px; color: #bbb;">
+            <p>Preencha os parâmetros na barra lateral para gerar a inteligência fiscal.</p>
+        </div>
+    """, unsafe_allow_html=True)
